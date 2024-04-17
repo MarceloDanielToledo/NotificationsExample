@@ -1,0 +1,176 @@
+﻿@using MudBlazor.Utilities
+@using NotificationsExample.Client.Dialogs
+@using NotificationsExample.Shared.Models
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject IDialogService DialogService
+@inherits MudComponentBase
+<MudElement @attributes="@UserAttributes"
+            Class="@Classname"
+            Style="@Style">
+    <MudMenu AnchorOrigin="Origin.BottomRight"
+             LockScroll="true"
+             TransformOrigin="Origin.TopRight">
+        <ActivatorContent>
+            <MudTooltip Arrow="true"
+                        Text="Notifications">
+                @if (Notifications.Any(x => x.IsActive))
+                {
+                    <MudBadge BadgeClass="notification-badge"
+                              Color="Color.Error"
+                              Content="Notifications.Where(x=>x.IsActive).Count()"
+                              Overlap="true"
+                              Visible="Notifications.Any()">
+                        <MudIconButton Color="Color.Default"
+                                       Icon="@Icons.Material.Filled.Notifications" />
+                    </MudBadge>
+                }
+                else
+                {
+                    <MudIconButton Color="Color.Default"
+                                   Icon="@Icons.Material.Filled.Notifications" />
+                }
+            </MudTooltip>
+        </ActivatorContent>
+        <ChildContent>
+            <div class="pb-2 pt-4"
+                 style="min-width: 330px;max-height: 600px;overflow-y: scroll">
+                <MudText Class="pb-2 px-6"
+                         Typo="Typo.body2">
+                    <b>Notifications</b>
+                </MudText>
+                <MudDivider Class="my-2" />
+                @if (Notifications != null && Notifications.Any())
+                {
+                    @foreach (var notification in Notifications.OrderByDescending(x => x.DateTimeStamp))
+                    {
+                        <MudMenuItem OnClick="(()=>ViewNotificationEvent(notification))">
+                            <div class="d-flex">
+                                <div class="mr-4">
+                                    <MudAvatar Color="@notification.NotificationColor"
+                                               Variant="Variant.Filled">
+                                        <MudIcon Icon="@notification.NotificationIcon" />
+                                    </MudAvatar>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.body2">@FormatHelper.GetMessage(notification.Message, 40)</MudText>
+                                    <div class="align-center d-flex">
+                                        <MudIcon Class="mr-1"
+                                                 Color="Color.Default"
+                                                 Icon="@Icons.Material.Filled.AccessTime"
+                                                 Style="font-size: 13px" />
+                                        <MudText Typo="Typo.caption">@notification.TimeSinceEventFormatted</MudText>
+                                    </div>
+                                </div>
+                            </div>
+                        </MudMenuItem>
+                    }
+                }
+                else
+                {
+                    <MudText Class="px-6 py-3"
+                             Typo="Typo.body2">
+                        You have no unread notifications.
+                    </MudText>
+                }
+                @if (Notifications != null && Notifications.Any())
+                {
+                    <MudDivider Class="my-2" />
+                    <div class="mt-4 mx-4">
+                        <MudButton Color="Color.Primary"
+                                   FullWidth="true"
+                                   OnClick="ViewAllNotifications"
+                                   Style="text-transform:none"
+                                   Variant="Variant.Text">
+                            View All
+                        </MudButton>
+                    </div>
+                }
+            </div>
+        </ChildContent>
+    </MudMenu>
+</MudElement>
+
+<style>
+
+    .notification-badge {
+        margin-left: -10px;
+        margin-bottom: -8px;
+    }
+</style>
+
+@code {
+    private string Classname =>
+        new CssBuilder()
+            .AddClass(Class)
+            .Build();
+
+    public List<Notification> Notifications => _notificationsContainer.Notifications;
+    [Parameter] public EventCallback<MouseEventArgs> OnClickViewAll { get; set; }
+    private HubConnection hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _notificationsContainer.StatusChanged += NotificationsUpdate;
+        LoadNotificationsExample();
+        hubConnection = new HubConnectionBuilder().WithUrl(_navigationManager.ToAbsoluteUri("/notificationhub")).Build();
+        hubConnection.On<string>("ReceiveNotifications", (receiveNotification) =>
+        {
+            var notificationDeserialized = JsonSerializer.Deserialize<Notification>(receiveNotification);
+            if (notificationDeserialized is not null)
+            {
+                _notificationsContainer.Add(notificationDeserialized);
+                _snackbar.Add($"New {notificationDeserialized.NotificationType} !", Severity.Info);
+            }
+            StateHasChanged();
+        });
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
+
+    private void NotificationsUpdate()
+    {
+
+        StateHasChanged();
+    }
+    private void LoadNotificationsExample()
+    {
+        _notificationsContainer.Add(new Notification() { NotificationType = Shared.Enums.EnumNotificationTypes.NewMessage, Message = "Hey, I'm Daniel.. Did you notice that service #12 isn't working at the moment?", DateTimeStamp = DateTime.Now.AddMinutes(-5), IsActive = true });
+        _notificationsContainer.Add(new Notification() { NotificationType = Shared.Enums.EnumNotificationTypes.ServiceMessage, Message = "Service #12 is currently experiencing downtime.", DateTimeStamp = DateTime.Now, IsActive = true });
+        _notificationsContainer.Add(new Notification() { NotificationType = Shared.Enums.EnumNotificationTypes.PricesUpdated, Message = "The price of product #123 has been revised.", DateTimeStamp = DateTime.Now, IsActive = true });
+        _notificationsContainer.Add(new Notification() { NotificationType = Shared.Enums.EnumNotificationTypes.OrderUpdated, Message = "The status of order #123 has been modified.", DateTimeStamp = DateTime.Now, IsActive = true });
+        _notificationsContainer.Add(new Notification() { NotificationType = Shared.Enums.EnumNotificationTypes.ProductUpdated, Message = "The details of the product #110 have been refreshed.", DateTimeStamp = DateTime.Now, IsActive = true });
+    }
+    private async Task ViewNotificationEvent(Notification notification)
+    {
+        notification.IsActive = false;
+        var result = await _sweelAlert.FireAsync(new SweetAlertOptions
+            {
+                Text = notification.Message,
+                Icon = SweetAlertIcon.Info,
+                ShowCancelButton = true,
+                ConfirmButtonText = "Delete",
+                CancelButtonText = "Close"
+            });
+        if (!string.IsNullOrEmpty(result.Value))
+        {
+            Notifications.Remove(notification);
+        }
+        StateHasChanged();
+    }
+
+    private async Task ViewAllNotifications()
+    {
+        await DialogService.Show<ViewAllNotificationsDialog>("All notifications", new DialogOptions()
+            {
+                MaxWidth = MaxWidth.Medium,
+                FullWidth = true,
+                DisableBackdropClick = true,
+                CloseButton = true
+            }).Result;
+    }
+}

@@ -1,0 +1,121 @@
+﻿@using System.Net
+@using System.Text
+@using NotificationsExample.Shared.Models
+<MudDialog DisableSidePadding="true">
+    <DialogContent>
+        <MudContainer Style="max-height: 300px; overflow-y: scroll">
+            @if (Notifications is not null && Notifications.Any())
+            {
+                <MudTable T="Notification" Items="@Notifications" Hover="true" Dense="true" Bordered="true" Outlined="true">
+                    <ColGroup>
+                        <col style="width: 5%;" />
+                        <col />
+                        <col style="width: 50%;" />
+                        <col style="width: 5%;" />
+                        <col />
+                    </ColGroup>
+                    <HeaderContent>
+                        <MudTh>
+                            <MudTableSortLabel SortBy="new Func<Notification, object>(x=>x.NotificationType)">
+                                Type
+                            </MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel SortBy="new Func<Notification, object>(x=>x.DateTimeStamp)">
+                                Date
+                            </MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel SortBy="new Func<Notification, object>(x=>x.Message)">
+                                Message
+                            </MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel SortBy="new Func<Notification, object>(x=>x.IsActive)">
+                                Read
+                            </MudTableSortLabel>
+                        </MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Type" Style="text-align:center">
+                            <MudIcon Color="@context.NotificationColor" Icon="@context.NotificationIcon" Title="@context.NotificationType.ToString()" Size="Size.Small" />
+                        </MudTd>
+                        <MudTd DataLabel="Date">
+                            @context.DateTimeStamp.ToString("dd/MM/yyyy hh:mm")
+                        </MudTd>
+                        <MudTd DataLabel="Message" title="@context.Message">
+                            @FormatHelper.GetMessage(context.Message, 50)
+
+                        </MudTd>
+                        <MudTd DataLabel="Read" Style="text-align: center">
+                            @if (!context.IsActive)
+                            {
+                                <MudIcon Color="Color.Success" Title="Read" Icon="@Icons.Material.Filled.MarkEmailRead" />
+                            }
+                            else
+                            {
+                                <MudIcon Color="Color.Error" Title="Unread" Icon="@Icons.Material.Filled.MarkAsUnread" />
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="">
+                            <MudMenu Icon="@Icons.Material.Filled.MenuOpen" Color="Color.Surface" Dense="true">
+                                <MudMenuItem IconSize="Size.Small"
+                                             IconColor="Color.Primary"
+                                             OnClick="(()=>ViewNotificationEvent(context))"
+                                             Icon="@Icons.Material.Filled.OpenWith">Open</MudMenuItem>
+                                <MudMenuItem IconSize="Size.Small"
+                                             IconColor="Color.Error"
+                                             OnClick="(()=>DeleteNotificationEvent(context))"
+                                             Icon="@Icons.Material.Filled.Delete">Delete</MudMenuItem>
+                            </MudMenu>
+                        </MudTd>
+                    </RowTemplate>
+
+                </MudTable>
+            }
+            else
+            {
+                <MudText Class="px-6 py-3"
+                         Typo="Typo.body2">
+                    You have no unread notifications.
+                </MudText>
+            }
+
+        </MudContainer>
+    </DialogContent>
+</MudDialog>
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    public List<Notification> Notifications => _notificationsContainer.Notifications;
+
+    protected override void OnInitialized()
+    {
+        _notificationsContainer.StatusChanged += NotificationsUpdate;
+        base.OnInitialized();
+    }
+
+    private void NotificationsUpdate() => StateHasChanged();
+    private async Task ViewNotificationEvent(Notification notification)
+    {
+        notification.IsActive = false;
+        var result = await _sweelAlert.FireAsync(new SweetAlertOptions
+            {
+                Text = notification.Message,
+                Icon = SweetAlertIcon.Info,
+                ShowCancelButton = true,
+                ConfirmButtonText = "Delete",
+                CancelButtonText = "Close"
+            });
+        if (!string.IsNullOrEmpty(result.Value))
+        {
+            Notifications.Remove(notification);
+        }
+        StateHasChanged();
+    }
+    private void DeleteNotificationEvent(Notification notification) => Notifications.Remove(notification);
+    private void Ok()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

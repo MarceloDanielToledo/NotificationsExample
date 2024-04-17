@@ -1,0 +1,57 @@
+﻿@page "/"
+@using NotificationsExample.Shared.Models
+@using System.Text.Json
+@implements IAsyncDisposable
+<MudGrid>
+    <MudItem></MudItem>
+</MudGrid>
+<MudGrid Justify="Justify.Center">
+    <MudItem xs="10">
+        <MudCard>
+            <MudCardContent>
+                <MudItem xs="12">
+                    <MudSelect Dense="true" T="EnumNotificationTypes"
+                               Label="Select message type"
+                               Variant="Variant.Outlined"
+                               ValueChanged="((value)=>MessateTypeChanged(value))">
+                        <MudSelectItem Value="EnumNotificationTypes.OrderUpdated" />
+                        <MudSelectItem Value="EnumNotificationTypes.ProductUpdated" />
+                        <MudSelectItem Value="EnumNotificationTypes.PricesUpdated" />
+                        <MudSelectItem Value="EnumNotificationTypes.ServiceMessage" />
+                        <MudSelectItem Value="EnumNotificationTypes.NewMessage" />
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Variant="Variant.Outlined" Label="Message" Required="true" @bind-Value="text" />
+                </MudItem>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Send())">Send</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string text { get; set; } = string.Empty;
+    private HubConnection hubConnection;
+    private Notification notification { get; set; } = new();
+    protected override async Task OnInitializedAsync()
+    {
+        notification.NotificationType = Shared.Enums.EnumNotificationTypes.NewMessage;
+        hubConnection = new HubConnectionBuilder().WithUrl(_navigationManager.ToAbsoluteUri("/notificationhub")).Build();
+        await hubConnection.StartAsync();
+    }
+    private void MessateTypeChanged(EnumNotificationTypes type) => notification.NotificationType = type;
+    async Task Send()
+    {
+        if (!string.IsNullOrEmpty(text))
+        {
+            notification.DateTimeStamp = DateTime.Now;
+            notification.Message = text;
+            string notificationSerialized = JsonSerializer.Serialize(notification);
+            await hubConnection.SendAsync("Send", notificationSerialized);
+        }
+    }
+    public async ValueTask DisposeAsync() => await hubConnection.DisposeAsync();
+}

@@ -1,0 +1,18 @@
+﻿@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.JSInterop
+@using NotificationsExample.Client
+@using MudBlazor
+@using NotificationsExample.Client.Services.Interfaces
+@using CurrieTechnologies.Razor.SweetAlert2
+@using Microsoft.AspNetCore.SignalR.Client
+@using NotificationsExample.Shared.Enums;
+@using NotificationsExample.Shared.Tools;
+
+@inject INotificationsContainer _notificationsContainer;
+@inject ISnackbar _snackbar;
+@inject NavigationManager _navigationManager;
+@inject SweetAlertService _sweelAlert;
